@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth";
 import { listResponses, getResponse } from "@/lib/responses";
 
 async function isAuthenticated() {
-  const cookieStore = await cookies();
-  const session = await getSession(cookieStore);
+  const session = await getSession();
   return session.isAdmin === true;
 }
 
@@ -18,7 +16,6 @@ export async function GET(request: NextRequest) {
   const filename = searchParams.get("filename");
 
   if (filename) {
-    // Security: prevent path traversal
     if (filename.includes("/") || filename.includes("\\") || filename.includes("..")) {
       return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
     }

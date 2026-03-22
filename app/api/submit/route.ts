@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { nanoid } from "nanoid";
+import { randomUUID } from "crypto";
 import { getQuestions } from "@/lib/questions";
 import { buildMarkdown, type Answers } from "@/lib/markdown";
 import { writeResponse } from "@/lib/responses";
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const id = nanoid(10);
+    const id = randomUUID().replace(/-/g, "").slice(0, 10);
     const date = new Date();
     const content = buildMarkdown(questions, answers, id, date);
 
@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, id });
   } catch (err) {
-    console.error("Submit error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Submit error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

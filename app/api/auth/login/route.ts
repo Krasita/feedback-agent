@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
@@ -20,14 +19,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const cookieStore = await cookies();
-    const session = await getSession(cookieStore);
+    const session = await getSession();
     session.isAdmin = true;
     await session.save();
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Login error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Login error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

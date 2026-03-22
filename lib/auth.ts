@@ -1,4 +1,5 @@
-import { SessionOptions, IronSession } from "iron-session";
+import { getIronSession, type IronSession, type SessionOptions } from "iron-session";
+import { cookies } from "next/headers";
 
 export interface SessionData {
   isAdmin?: boolean;
@@ -14,9 +15,7 @@ export const sessionOptions: SessionOptions = {
   },
 };
 
-export async function getSession(
-  cookieStore: Awaited<ReturnType<typeof import("next/headers")["cookies"]>>
-): Promise<IronSession<SessionData>> {
-  const { getIronSession } = await import("iron-session");
+export async function getSession(): Promise<IronSession<SessionData>> {
+  const cookieStore = await cookies();
   return getIronSession<SessionData>(cookieStore as never, sessionOptions);
 }
