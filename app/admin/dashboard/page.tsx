@@ -4,7 +4,10 @@ import { useState, useEffect } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import ResponseList from "@/components/admin/ResponseList";
 import ResponseDetail from "@/components/admin/ResponseDetail";
+import SummaryPanel from "@/components/admin/SummaryPanel";
 import type { ResponseMeta } from "@/lib/responses";
+
+type Tab = "responses" | "summary";
 
 function StatsBar({ responses }: { responses: ResponseMeta[] }) {
   const withStars = responses.filter((r) => r.averageStars !== undefined);
@@ -38,6 +41,7 @@ export default function AdminDashboard() {
   const [responses, setResponses] = useState<ResponseMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("responses");
 
   useEffect(() => {
     fetch("/api/responses")
@@ -63,7 +67,10 @@ export default function AdminDashboard() {
         <ResponseList
           responses={responses}
           selectedFilename={selected}
-          onSelect={setSelected}
+          onSelect={(filename) => {
+            setSelected(filename);
+            setTab("responses");
+          }}
         />
       )}
     </div>
@@ -78,7 +85,41 @@ export default function AdminDashboard() {
       ) : (
         <>
           <StatsBar responses={responses} />
-          <ResponseDetail filename={selected} />
+
+          {/* Tab bar */}
+          <div className="flex gap-1 mb-6 bg-primary-pale rounded-xl p-1 w-fit">
+            <button
+              onClick={() => setTab("responses")}
+              className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-all duration-150
+                ${tab === "responses"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-primary-muted hover:text-primary"
+                }`}
+            >
+              Responses
+            </button>
+            <button
+              onClick={() => setTab("summary")}
+              className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold rounded-lg transition-all duration-150
+                ${tab === "summary"
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-primary-muted hover:text-primary"
+                }`}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+              AI Analysis
+            </button>
+          </div>
+
+          {/* Tab content */}
+          {tab === "responses" && (
+            <ResponseDetail filename={selected} />
+          )}
+          {tab === "summary" && (
+            <SummaryPanel responseCount={responses.length} />
+          )}
         </>
       )}
     </AdminLayout>
