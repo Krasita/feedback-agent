@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getSession } from "@/lib/auth";
 import { listResponses, getResponse } from "@/lib/responses";
+import { getSessions } from "@/lib/sessions";
 
 export const maxDuration = 120;
 
@@ -26,19 +27,31 @@ Numbered list of concrete, practical actions the training team should take befor
 
 Write in a professional but direct tone. Reference specific patterns in the data wherever possible.`;
 
-export async function GET() {
-  const session = await getSession();
-  if (!session.isAdmin) {
+export async function GET(request: NextRequest) {
+  const authSession = await getSession();
+  if (!authSession.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const responses = await listResponses();
+  const sessionId = request.nextUrl.searchParams.get("sessionId");
+  if (!sessionId) {
+    return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
+  }
+
+  // Verify session exists
+  const sessions = await getSessions();
+  const trainingSession = sessions.find((s) => s.id === sessionId);
+  if (!trainingSession) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+
+  const responses = await listResponses(sessionId);
   if (responses.length === 0) {
-    return NextResponse.json({ error: "No responses to analyse yet." }, { status: 400 });
+    return NextResponse.json({ error: "No responses to analyse yet for this session." }, { status: 400 });
   }
 
   const contents = (
-    await Promise.all(responses.map((r) => getResponse(r.filename)))
+    await Promise.all(responses.map((r) => getResponse(sessionId, r.filename)))
   ).filter((c): c is string => !!c);
 
   if (contents.length === 0) {
@@ -47,9 +60,8 @@ export async function GET() {
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  const prompt = `${SYSTEM_PROMPT}\n\nPlease analyse the following ${contents.length} feedback response(s) from our training session and produce a report:\n\n${contents.map((c, i) => `### Response ${i + 1}\n${c}`).join("\n\n---\n\n")}`;
+  const prompt = `${SYSTEM_PROMPT}\n\nSession: "${trainingSession.name}"\n\nPlease analyse the following ${contents.length} feedback response(s) and produce a report:\n\n${contents.map((c, i) => `### Response ${i + 1}\n${c}`).join("\n\n---\n\n")}`;
 
-  // Start the Gemini stream — if this throws (bad key, quota, etc.) return a proper JSON error
   let result: AsyncIterable<{ text: string }>;
   try {
     result = await ai.models.generateContentStream({
@@ -57,7 +69,6 @@ export async function GET() {
       contents: prompt,
     }) as AsyncIterable<{ text: string }>;
   } catch (err) {
-    // Gemini wraps the real message in multiple levels of JSON — unwrap them all
     let msg = err instanceof Error ? err.message : String(err);
     for (let i = 0; i < 4; i++) {
       try {
@@ -66,9 +77,7 @@ export async function GET() {
         if (typeof next === "string") { msg = next; } else { break; }
       } catch { break; }
     }
-    // Take only the first human-readable line
     msg = msg.split(/\\n|\n/)[0].trim() || msg;
-    // Make quota errors friendlier
     if (msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("429")) {
       msg = "Gemini free-tier quota exceeded. Please create a new API key at aistudio.google.com/app/apikey linked to a project with billing enabled, or wait and try again.";
     }
@@ -81,9 +90,7 @@ export async function GET() {
       try {
         for await (const chunk of result) {
           const text = chunk.text;
-          if (text) {
-            controller.enqueue(encoder.encode(text));
-          }
+          if (text) controller.enqueue(encoder.encode(text));
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

@@ -13,19 +13,22 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = request.nextUrl;
+  const sessionId = searchParams.get("sessionId");
   const filename = searchParams.get("filename");
+
+  if (!sessionId) {
+    return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
+  }
 
   if (filename) {
     if (filename.includes("/") || filename.includes("\\") || filename.includes("..")) {
       return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
     }
-    const content = await getResponse(filename);
-    if (!content) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
+    const content = await getResponse(sessionId, filename);
+    if (!content) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ content });
   }
 
-  const responses = await listResponses();
+  const responses = await listResponses(sessionId);
   return NextResponse.json({ responses });
 }

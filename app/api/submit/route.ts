@@ -3,9 +3,18 @@ import { randomUUID } from "crypto";
 import { getQuestions } from "@/lib/questions";
 import { buildMarkdown, type Answers } from "@/lib/markdown";
 import { writeResponse } from "@/lib/responses";
+import { getActiveSession } from "@/lib/sessions";
 
 export async function POST(request: NextRequest) {
   try {
+    const activeSession = await getActiveSession();
+    if (!activeSession) {
+      return NextResponse.json(
+        { error: "No active session. Please ask the trainer to activate a session." },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { answers } = body as { answers: Answers };
 
@@ -15,7 +24,6 @@ export async function POST(request: NextRequest) {
 
     const questions = getQuestions();
 
-    // Validate required fields
     for (const q of questions) {
       if (q.required) {
         const a = answers[q.id];
@@ -32,7 +40,7 @@ export async function POST(request: NextRequest) {
     const date = new Date();
     const content = buildMarkdown(questions, answers, id, date);
 
-    await writeResponse(id, date, content);
+    await writeResponse(activeSession.id, id, date, content);
 
     return NextResponse.json({ success: true, id });
   } catch (err) {

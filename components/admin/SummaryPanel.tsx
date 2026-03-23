@@ -78,7 +78,7 @@ function renderMarkdown(text: string) {
   return elements;
 }
 
-export default function SummaryPanel({ responseCount }: { responseCount: number }) {
+export default function SummaryPanel({ sessionId, responseCount }: { sessionId: string; responseCount: number }) {
   const [status, setStatus] = useState<Status>("idle");
   const [text, setText] = useState("");
   const [error, setError] = useState("");
@@ -94,7 +94,7 @@ export default function SummaryPanel({ responseCount }: { responseCount: number 
     abortRef.current = new AbortController();
 
     try {
-      const res = await fetch("/api/summary", { signal: abortRef.current.signal });
+      const res = await fetch(`/api/summary?sessionId=${encodeURIComponent(sessionId)}`, { signal: abortRef.current.signal });
 
       if (!res.ok) {
         const body = await res.text();
@@ -197,7 +197,7 @@ export default function SummaryPanel({ responseCount }: { responseCount: number 
             </svg>
           </div>
           <p className="text-sm font-medium text-primary mb-1">Ready to analyse {responseCount} response{responseCount !== 1 ? "s" : ""}</p>
-          <p className="text-xs text-primary-muted">Claude will summarise the feedback, identify patterns, and suggest concrete next steps for your training programme.</p>
+          <p className="text-xs text-primary-muted">Gemini will summarise the feedback, identify patterns, and suggest concrete next steps for your training programme.</p>
         </div>
       )}
 

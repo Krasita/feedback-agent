@@ -3,13 +3,12 @@
 import { useState, useEffect } from "react";
 
 interface ResponseDetailProps {
+  sessionId: string;
   filename: string | null;
 }
 
 function renderMarkdownSection(content: string) {
-  // Remove frontmatter
   const withoutFront = content.replace(/^---[\s\S]*?---\n*/m, "");
-  // Remove main title
   const withoutTitle = withoutFront.replace(/^# .+\n*/m, "");
   const lines = withoutTitle.split("\n");
 
@@ -28,12 +27,9 @@ function renderMarkdownSection(content: string) {
         i++;
       }
       const answer = answersLines.join("\n").trim();
-
       elements.push(
         <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-          <p className="text-xs font-semibold text-primary-muted uppercase tracking-wide mb-2">
-            {question}
-          </p>
+          <p className="text-xs font-semibold text-primary-muted uppercase tracking-wide mb-2">{question}</p>
           <p className="text-base text-foreground whitespace-pre-wrap">{answer || "—"}</p>
         </div>
       );
@@ -51,24 +47,18 @@ function renderMarkdownSection(content: string) {
   return elements;
 }
 
-export default function ResponseDetail({ filename }: ResponseDetailProps) {
+export default function ResponseDetail({ sessionId, filename }: ResponseDetailProps) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!filename) {
-      setContent(null);
-      return;
-    }
+    if (!filename || !sessionId) { setContent(null); return; }
     setLoading(true);
-    fetch(`/api/responses?filename=${encodeURIComponent(filename)}`)
+    fetch(`/api/responses?sessionId=${encodeURIComponent(sessionId)}&filename=${encodeURIComponent(filename)}`)
       .then((r) => r.json())
-      .then((data) => {
-        setContent(data.content ?? null);
-        setLoading(false);
-      })
+      .then((data: { content?: string }) => { setContent(data.content ?? null); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [filename]);
+  }, [filename, sessionId]);
 
   if (!filename) {
     return (
@@ -98,17 +88,11 @@ export default function ResponseDetail({ filename }: ResponseDetailProps) {
     );
   }
 
-  if (!content) {
-    return (
-      <div className="p-8 text-center text-gray-500">Response not found.</div>
-    );
-  }
+  if (!content) return <div className="p-8 text-center text-gray-500">Response not found.</div>;
 
   return (
     <div className="max-w-2xl animate-scale-in">
-      <div className="space-y-4">
-        {renderMarkdownSection(content)}
-      </div>
+      <div className="space-y-4">{renderMarkdownSection(content)}</div>
     </div>
   );
 }
