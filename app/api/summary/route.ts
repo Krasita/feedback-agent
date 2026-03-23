@@ -53,12 +53,19 @@ export async function GET() {
   let result: AsyncIterable<{ text: string }>;
   try {
     result = await ai.models.generateContentStream({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: prompt,
     }) as AsyncIterable<{ text: string }>;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Gemini error: ${msg}` }, { status: 502 });
+    // Extract human-readable message from Gemini's nested JSON error
+    let msg = err instanceof Error ? err.message : String(err);
+    try {
+      const inner = JSON.parse(msg);
+      msg = inner?.error?.message ?? inner?.message ?? msg;
+      // Trim at first newline / quota detail so we don't dump the whole payload
+      msg = msg.split("\\n")[0].split("\n")[0].trim();
+    } catch { /* not JSON — use as-is */ }
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 
   const encoder = new TextEncoder();
