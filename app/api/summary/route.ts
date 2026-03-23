@@ -49,10 +49,17 @@ export async function GET() {
 
   const prompt = `${SYSTEM_PROMPT}\n\nPlease analyse the following ${contents.length} feedback response(s) from our training session and produce a report:\n\n${contents.map((c, i) => `### Response ${i + 1}\n${c}`).join("\n\n---\n\n")}`;
 
-  const result = await ai.models.generateContentStream({
-    model: "gemini-2.0-flash",
-    contents: prompt,
-  });
+  // Start the Gemini stream — if this throws (bad key, quota, etc.) return a proper JSON error
+  let result: AsyncIterable<{ text: string }>;
+  try {
+    result = await ai.models.generateContentStream({
+      model: "gemini-2.0-flash",
+      contents: prompt,
+    }) as AsyncIterable<{ text: string }>;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: `Gemini error: ${msg}` }, { status: 502 });
+  }
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream({

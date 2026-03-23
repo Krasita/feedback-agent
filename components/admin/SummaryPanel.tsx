@@ -97,8 +97,10 @@ export default function SummaryPanel({ responseCount }: { responseCount: number 
       const res = await fetch("/api/summary", { signal: abortRef.current.signal });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? `HTTP ${res.status}`);
+        const body = await res.text();
+        let msg = `HTTP ${res.status}`;
+        try { msg = (JSON.parse(body) as { error?: string }).error ?? msg; } catch { /* non-JSON body */ }
+        throw new Error(msg);
       }
 
       setStatus("streaming");
@@ -137,7 +139,7 @@ export default function SummaryPanel({ responseCount }: { responseCount: number 
         <div>
           <h2 className="text-xl font-bold text-foreground">AI Analysis</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            Powered by Claude · {responseCount} response{responseCount !== 1 ? "s" : ""} analysed
+            Powered by Gemini · {responseCount} response{responseCount !== 1 ? "s" : ""} analysed
           </p>
         </div>
 
