@@ -1,4 +1,4 @@
-import { list, put, head } from "@vercel/blob";
+import { list, put } from "@vercel/blob";
 
 const PREFIX = "responses/";
 
@@ -9,25 +9,41 @@ export interface ResponseMeta {
   averageStars?: number;
 }
 
+/** Extract the last path segment from a blob URL */
 function parseFilename(url: string): string {
   return url.split("/").pop() ?? url;
 }
 
-function extractMeta(content: string, filename: string): ResponseMeta {
-  const idMatch = content.match(/^id:\s*(.+)$/m);
-  const dateMatch = content.match(/^date:\s*(.+)$/m);
-  const starMatches = [...content.matchAll(/★+☆* \((\d)\/5\)/g)];
-  let averageStars: number | undefined;
-  if (starMatches.length > 0) {
-    const sum = starMatches.reduce((acc, m) => acc + Number(m[1]), 0);
-    averageStars = Math.round((sum / starMatches.length) * 10) / 10;
+/** Parse id and date out of the filename instead of fetching content */
+function extractIdAndDate(filename: string): { id: string; date: string } {
+  // Filename format: YYYY-MM-DD_HH-MM-SS_ID.md
+  const match = filename.match(/^(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})_([^.]+)\.md$/);
+  if (!match) return { id: filename, date: "" };
+  const [, datePart, timePart, id] = match;
+  const isoDate = `${datePart}T${timePart.replace(/-/g, ":")}Z`;
+  return { id, date: new Date(isoDate).toISOString() };
+}
+
+/** Fetch private blob content using the store token for auth */
+async function fetchBlobContent(blobUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(blobUrl, {
+      headers: {
+        Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`,
+      },
+    });
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
   }
-  return {
-    id: idMatch ? idMatch[1].trim() : filename,
-    date: dateMatch ? dateMatch[1].trim() : "",
-    filename,
-    averageStars,
-  };
+}
+
+function extractAverageStars(content: string): number | undefined {
+  const starMatches = [...content.matchAll(/★+☆* \((\d)\/5\)/g)];
+  if (starMatches.length === 0) return undefined;
+  const sum = starMatches.reduce((acc, m) => acc + Number(m[1]), 0);
+  return Math.round((sum / starMatches.length) * 10) / 10;
 }
 
 export async function writeResponse(
@@ -56,13 +72,13 @@ export async function listResponses(): Promise<ResponseMeta[]> {
   const results = await Promise.all(
     sorted.map(async (blob) => {
       const filename = parseFilename(blob.url);
-      try {
-        const res = await fetch(blob.downloadUrl);
-        const content = await res.text();
-        return extractMeta(content, filename);
-      } catch {
-        return { id: filename, date: blob.uploadedAt.toISOString(), filename };
-      }
+      const { id, date } = extractIdAndDate(filename);
+
+      // Fetch content only to extract star ratings
+      const content = await fetchBlobContent(blob.url);
+      const averageStars = content ? extractAverageStars(content) : undefined;
+
+      return { id, date, filename, averageStars };
     })
   );
 
@@ -73,10 +89,5 @@ export async function getResponse(filename: string): Promise<string | null> {
   const { blobs } = await list({ prefix: `${PREFIX}${filename}` });
   if (blobs.length === 0) return null;
 
-  try {
-    const res = await fetch(blobs[0].downloadUrl);
-    return await res.text();
-  } catch {
-    return null;
-  }
+  return fetchBlobContent(blobs[0].url);
 }
