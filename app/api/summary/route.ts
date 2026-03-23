@@ -1,37 +1,11 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import { getSession } from "@/lib/auth";
 import { listResponses, getResponse } from "@/lib/responses";
 
 export const maxDuration = 120;
 
-export async function GET() {
-  const session = await getSession();
-  if (!session.isAdmin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const responses = await listResponses();
-  if (responses.length === 0) {
-    return NextResponse.json({ error: "No responses to analyse yet." }, { status: 400 });
-  }
-
-  // Fetch full markdown content of every response
-  const contents = (
-    await Promise.all(responses.map((r) => getResponse(r.filename)))
-  ).filter((c): c is string => !!c);
-
-  if (contents.length === 0) {
-    return NextResponse.json({ error: "Could not read response content." }, { status: 500 });
-  }
-
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-  const stream = client.messages.stream({
-    model: "claude-opus-4-6",
-    max_tokens: 4000,
-    thinking: { type: "adaptive" },
-    system: `You are an expert learning & development analyst. Your job is to analyse post-training feedback and produce an insightful report for trainers.
+const SYSTEM_PROMPT = `You are an expert learning & development analyst. Your job is to analyse post-training feedback and produce an insightful report for trainers.
 
 Structure your response exactly as follows (use these exact markdown headings):
 
@@ -50,26 +24,44 @@ Honest, specific weaknesses or gaps identified in the feedback.
 ## Actionable Suggestions for Next Steps
 Numbered list of concrete, practical actions the training team should take before or during the next session. Be specific — not generic advice.
 
-Write in a professional but direct tone. Reference specific patterns in the data wherever possible.`,
-    messages: [
-      {
-        role: "user",
-        content: `Please analyse the following ${contents.length} feedback response(s) from our training session and produce a report:\n\n${contents.map((c, i) => `### Response ${i + 1}\n${c}`).join("\n\n---\n\n")}`,
-      },
-    ],
+Write in a professional but direct tone. Reference specific patterns in the data wherever possible.`;
+
+export async function GET() {
+  const session = await getSession();
+  if (!session.isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const responses = await listResponses();
+  if (responses.length === 0) {
+    return NextResponse.json({ error: "No responses to analyse yet." }, { status: 400 });
+  }
+
+  const contents = (
+    await Promise.all(responses.map((r) => getResponse(r.filename)))
+  ).filter((c): c is string => !!c);
+
+  if (contents.length === 0) {
+    return NextResponse.json({ error: "Could not read response content." }, { status: 500 });
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+  const prompt = `${SYSTEM_PROMPT}\n\nPlease analyse the following ${contents.length} feedback response(s) from our training session and produce a report:\n\n${contents.map((c, i) => `### Response ${i + 1}\n${c}`).join("\n\n---\n\n")}`;
+
+  const result = await ai.models.generateContentStream({
+    model: "gemini-2.0-flash",
+    contents: prompt,
   });
 
-  // Stream only text deltas (skip thinking blocks)
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
     async start(controller) {
       try {
-        for await (const event of stream) {
-          if (
-            event.type === "content_block_delta" &&
-            event.delta.type === "text_delta"
-          ) {
-            controller.enqueue(encoder.encode(event.delta.text));
+        for await (const chunk of result) {
+          const text = chunk.text;
+          if (text) {
+            controller.enqueue(encoder.encode(text));
           }
         }
       } catch (err) {
