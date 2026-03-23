@@ -57,14 +57,21 @@ export async function GET() {
       contents: prompt,
     }) as AsyncIterable<{ text: string }>;
   } catch (err) {
-    // Extract human-readable message from Gemini's nested JSON error
+    // Gemini wraps the real message in multiple levels of JSON — unwrap them all
     let msg = err instanceof Error ? err.message : String(err);
-    try {
-      const inner = JSON.parse(msg);
-      msg = inner?.error?.message ?? inner?.message ?? msg;
-      // Trim at first newline / quota detail so we don't dump the whole payload
-      msg = msg.split("\\n")[0].split("\n")[0].trim();
-    } catch { /* not JSON — use as-is */ }
+    for (let i = 0; i < 4; i++) {
+      try {
+        const parsed = JSON.parse(msg);
+        const next: unknown = parsed?.error?.message ?? parsed?.message;
+        if (typeof next === "string") { msg = next; } else { break; }
+      } catch { break; }
+    }
+    // Take only the first human-readable line
+    msg = msg.split(/\\n|\n/)[0].trim() || msg;
+    // Make quota errors friendlier
+    if (msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("429")) {
+      msg = "Gemini free-tier quota exceeded. Please create a new API key at aistudio.google.com/app/apikey linked to a project with billing enabled, or wait and try again.";
+    }
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 
