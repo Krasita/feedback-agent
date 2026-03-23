@@ -39,7 +39,7 @@ export async function writeResponse(
   const filename = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}_${id}.md`;
 
   await put(`${PREFIX}${filename}`, content, {
-    access: "public",
+    access: "private",
     contentType: "text/markdown; charset=utf-8",
   });
 
@@ -57,7 +57,7 @@ export async function listResponses(): Promise<ResponseMeta[]> {
     sorted.map(async (blob) => {
       const filename = parseFilename(blob.url);
       try {
-        const res = await fetch(blob.url);
+        const res = await fetch(blob.downloadUrl);
         const content = await res.text();
         return extractMeta(content, filename);
       } catch {
@@ -74,7 +74,7 @@ export async function getResponse(filename: string): Promise<string | null> {
   if (blobs.length === 0) return null;
 
   try {
-    const res = await fetch(blobs[0].url);
+    const res = await fetch(blobs[0].downloadUrl);
     return await res.text();
   } catch {
     return null;
