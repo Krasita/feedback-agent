@@ -13,21 +13,8 @@
   },
   {
     "id": "q3",
-    "type": "star",
-    "question": "How would you rate the trainer's delivery and engagement?",
-    "required": true
-  },
-  {
-    "id": "q4",
-    "type": "multiple_choice",
-    "question": "Which aspect of the training did you find most valuable?",
-    "options": ["Practical exercises", "Theoretical content", "Q&A session", "Materials provided"],
-    "required": true
-  },
-  {
-    "id": "q5",
     "type": "open_text",
-    "question": "What suggestions do you have to improve future training sessions?",
+    "question": "What would make future training sessions more useful for you? Please share any topics, features, or tools you would like us to include.",
     "required": false
   }
 ]
