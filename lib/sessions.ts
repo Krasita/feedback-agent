@@ -19,7 +19,10 @@ const INITIAL_SESSION: Session = {
 async function fetchSessionsRaw(): Promise<string | null> {
   const { blobs } = await list({ prefix: SESSIONS_BLOB });
   if (blobs.length === 0) return null;
-  const res = await fetch(blobs[0].downloadUrl);
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  const res = await fetch(blobs[0].url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok) return null;
   return res.text();
 }
