@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
   let result: AsyncIterable<{ text: string }>;
   try {
     result = await ai.models.generateContentStream({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.0-flash-lite",
       contents: prompt,
     }) as AsyncIterable<{ text: string }>;
   } catch (err) {
