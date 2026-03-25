@@ -1,4 +1,4 @@
-import { list, put } from "@vercel/blob";
+import { list, put, del } from "@vercel/blob";
 
 export interface ResponseMeta {
   id: string;
@@ -81,6 +81,13 @@ export async function getResponse(
   const { blobs } = await list({ prefix: `${prefix(sessionId)}${filename}` });
   if (blobs.length === 0) return null;
   return fetchBlobContent(blobs[0].url);
+}
+
+export async function deleteResponse(sessionId: string, filename: string): Promise<boolean> {
+  const { blobs } = await list({ prefix: `${prefix(sessionId)}${filename}` });
+  if (blobs.length === 0) return false;
+  await del(blobs[0].url);
+  return true;
 }
 
 export async function countResponses(sessionId: string): Promise<number> {

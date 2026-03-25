@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listResponses, getResponse } from "@/lib/responses";
+import { listResponses, getResponse, deleteResponse } from "@/lib/responses";
 
 async function isAuthenticated() {
   const session = await getSession();
@@ -31,4 +31,26 @@ export async function GET(request: NextRequest) {
 
   const responses = await listResponses(sessionId);
   return NextResponse.json({ responses });
+}
+
+export async function DELETE(request: NextRequest) {
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = request.nextUrl;
+  const sessionId = searchParams.get("sessionId");
+  const filename = searchParams.get("filename");
+
+  if (!sessionId || !filename) {
+    return NextResponse.json({ error: "sessionId and filename are required" }, { status: 400 });
+  }
+
+  if (filename.includes("/") || filename.includes("\\") || filename.includes("..")) {
+    return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
+  }
+
+  const deleted = await deleteResponse(sessionId, filename);
+  if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ success: true });
 }

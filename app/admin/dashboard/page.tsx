@@ -179,6 +179,10 @@ export default function AdminDashboard() {
                   <ResponseDetail
                     sessionId={selectedSessionId!}
                     filename={selectedFilename}
+                    onDeleted={(deleted) => {
+                      setResponses((prev) => prev.filter((r) => r.filename !== deleted));
+                      setSelectedFilename(null);
+                    }}
                   />
                 </div>
               </div>

@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 interface ResponseDetailProps {
   sessionId: string;
   filename: string | null;
+  onDeleted?: (filename: string) => void;
 }
 
 function renderMarkdownSection(content: string) {
@@ -47,9 +48,10 @@ function renderMarkdownSection(content: string) {
   return elements;
 }
 
-export default function ResponseDetail({ sessionId, filename }: ResponseDetailProps) {
+export default function ResponseDetail({ sessionId, filename, onDeleted }: ResponseDetailProps) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!filename || !sessionId) { setContent(null); return; }
@@ -88,10 +90,30 @@ export default function ResponseDetail({ sessionId, filename }: ResponseDetailPr
     );
   }
 
+  async function handleDelete() {
+    if (!filename || !window.confirm("Delete this response? This cannot be undone.")) return;
+    setDeleting(true);
+    await fetch(`/api/responses?sessionId=${encodeURIComponent(sessionId)}&filename=${encodeURIComponent(filename)}`, { method: "DELETE" });
+    setDeleting(false);
+    onDeleted?.(filename);
+  }
+
   if (!content) return <div className="p-8 text-center text-gray-500">Response not found.</div>;
 
   return (
     <div className="max-w-2xl animate-scale-in">
+      <div className="flex justify-end mb-3">
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {deleting ? "Deleting…" : "Delete"}
+        </button>
+      </div>
       <div className="space-y-4">{renderMarkdownSection(content)}</div>
     </div>
   );
